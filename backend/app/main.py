@@ -27,6 +27,8 @@ class DeviceState:
         self.uptime = 0.0
         self.cycle_time = random.uniform(2, 8)
         self.quality_rate = random.uniform(0.95, 0.995)
+        self.vx = random.uniform(-0.25, 0.25)
+        self.vz = random.uniform(-0.25, 0.25)
 
     def to_dict(self):
         return {
@@ -42,6 +44,8 @@ devices = {i: DeviceState(i, random.choice(DEVICE_TYPES),
 
 production_log = []
 anomaly_log = []
+# 轨迹回放记录：每台设备保留最近 900 个位置/状态采样点（约 15 分钟）
+trajectory_log = defaultdict(lambda: deque(maxlen=900))
 
 class AnomalyRules:
     def __init__(self):
@@ -97,9 +101,24 @@ def simulate():
                     dev.production_count += 1
                 dev.uptime += 1
 
+            # AGV 在运行状态下沿车间移动，形成可回放的轨迹
+            if dev.type == "AGV" and dev.status == "RUNNING":
+                dev.position[0] = max(-5, min(5, dev.position[0] + dev.vx))
+                dev.position[2] = max(-5, min(5, dev.position[2] + dev.vz))
+                if abs(dev.position[0]) >= 5:
+                    dev.vx *= -1
+                if abs(dev.position[2]) >= 5:
+                    dev.vz *= -1
+
             triggers = rules_engine.check(dev)
             if triggers and dev.status != "FAULT" and random.random() < 0.3:
                 dev.status = "FAULT"
+
+            trajectory_log[dev.id].append({
+                "t": round(time.time(), 3),
+                "position": [round(p, 3) for p in dev.position],
+                "status": dev.status
+            })
 
         production_log.append({"timestamp": time.time(), "count": sum(d.production_count for d in devices.values())})
 
@@ -168,6 +187,38 @@ def get_oee():
 @app.get("/api/production")
 def get_production():
     return {"log": production_log[-60:]}
+
+
+@app.get("/api/trajectory/segments")
+def get_trajectory_segments():
+    """把轨迹记录按"同一设备、状态连续"切分成回放段，供前端清单与下载使用。"""
+    segments = []
+    for did, points in trajectory_log.items():
+        dev = devices.get(did)
+        if dev is None:
+            continue
+        current = None
+        for p in points:
+            if current is None or p["status"] != current["status"]:
+                if current is not None:
+                    current["point_count"] = len(current["points"])
+                    segments.append(current)
+                current = {
+                    "id": f"{did}-{p['t']}-{p['status']}",
+                    "device_id": did,
+                    "device_type": dev.type,
+                    "status": p["status"],
+                    "start": p["t"],
+                    "end": p["t"],
+                    "points": []
+                }
+            current["end"] = p["t"]
+            current["points"].append(p)
+        if current is not None:
+            current["point_count"] = len(current["points"])
+            segments.append(current)
+    segments.sort(key=lambda s: s["start"], reverse=True)
+    return {"segments": segments, "server_time": time.time()}
 
 
 @app.websocket("/ws")

@@ -22,6 +22,16 @@ export interface FactoryData {
   oee: OEEItem[]
 }
 
+export interface TrajectoryPoint {
+  t: number; position: number[]; status: string
+}
+
+export interface TrajectorySegment {
+  id: string; device_id: number; device_type: string; status: string
+  start: number; end: number; point_count: number
+  points: TrajectoryPoint[]
+}
+
 export const DEVICE_COLORS: Record<string, string> = {
   CNC: '#e74c3c', RobotArm: '#3498db', Conveyor: '#f39c12',
   AGV: '#2ecc71', InjectionMolding: '#9b59b6', QCStation: '#1abc9c'

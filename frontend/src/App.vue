@@ -13,6 +13,7 @@
       <div class="panel-col">
         <DeviceList />
         <AnomalyList />
+        <TrajectoryReplay />
       </div>
     </div>
     <div class="dashboard-row">
@@ -28,6 +29,7 @@ import { onMounted, onUnmounted } from 'vue'
 import FactoryScene from './components/FactoryScene.vue'
 import DeviceList from './components/DeviceList.vue'
 import AnomalyList from './components/AnomalyList.vue'
+import TrajectoryReplay from './components/TrajectoryReplay.vue'
 import OEEChart from './components/OEEChart.vue'
 import TrendPanel from './components/TrendPanel.vue'
 import FaultPie from './components/FaultPie.vue'
