@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import type { FactoryData } from '@/types'
+import { ingestDevices } from '@/composables/useReplay'
 
 export const useFactoryStore = defineStore('factory', () => {
   const data = ref<FactoryData | null>(null)
@@ -13,7 +14,11 @@ export const useFactoryStore = defineStore('factory', () => {
     const s = new WebSocket(`${protocol}//${location.hostname}:8000/ws`)
     s.onopen = () => { connected.value = true; console.log('WS connected') }
     s.onmessage = (e) => {
-      try { data.value = JSON.parse(e.data) } catch {}
+      try {
+        data.value = JSON.parse(e.data)
+        // 实时帧进入轨迹回放录制(按段留存位置与状态)
+        if (data.value?.devices?.length) ingestDevices(data.value.devices)
+      } catch {}
     }
     s.onclose = () => { connected.value = false; ws.value = null }
     ws.value = s
